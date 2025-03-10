@@ -1,7 +1,7 @@
 [
   {
     "repo": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
-    "commit": "4c7858d"
+    "commit": "031c4ae"
   },
   {
     "repo": "https://github.com/cubiq/ComfyUI_essentials",
@@ -9,7 +9,7 @@
   },
   {
     "repo": "https://github.com/kijai/ComfyUI-KJNodes",
-    "commit": "fa6d20e"
+    "commit": "2639615"
   },
   {
     "repo": "https://github.com/Fannovel16/ComfyUI-Frame-Interpolation",
@@ -25,7 +25,7 @@
   },
   {
     "repo": "https://github.com/lldacing/ComfyUI_Patches_ll",
-    "commit": "f12f956"
+    "commit": "314a84d"
   },
   {
     "repo": "https://github.com/chengzeyi/Comfy-WaveSpeed",
