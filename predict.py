@@ -14,10 +14,6 @@ ALL_DIRECTORIES = [OUTPUT_DIR, INPUT_DIR, COMFYUI_TEMP_OUTPUT_DIR]
 
 mimetypes.add_type("image/webp", ".webp")
 api_json_file = "workflow.json"
-
-# Force HF offline
-os.environ["HF_DATASETS_OFFLINE"] = "1"
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
 class Predictor(BasePredictor):
@@ -108,7 +104,7 @@ class Predictor(BasePredictor):
             default=81,
         ),
         model: str = Input(
-            description="The model to use. 1.3b is faster, but 14b is better quality. A LORA either works with 1.3b or 14b, depending on the version if was trained on.",
+            description="The model to use. 1.3b is faster, but 14b is better quality. A LORA either works with 1.3b or 14b, depending on the version it was trained on.",
             choices=["1.3b", "14b"],
             default="14b",
         ),
@@ -117,11 +113,11 @@ class Predictor(BasePredictor):
             default=None,
         ),
         lora_strength_model: float = Input(
-            description="Strength of the LORA applied to the model. 1.0 is the default strength. 0.0 is no LORA.",
+            description="Strength of the LORA applied to the model. 0.0 is no LORA.",
             default=1.0,
         ),
         lora_strength_clip: float = Input(
-            description="Strength of the LORA applied to the CLIP model. 1.0 is the default strength. 0.0 is no LORA.",
+            description="Strength of the LORA applied to the CLIP model. 0.0 is no LORA.",
             default=1.0,
         ),
         sample_shift: float = Input(
