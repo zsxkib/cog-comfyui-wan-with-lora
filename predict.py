@@ -166,4 +166,4 @@ class Predictor(BasePredictor):
         self.comfyUI.connect()
         self.comfyUI.run_workflow(wf)
 
-        return self.comfyUI.get_files(OUTPUT_DIR, "mp4")
+        return self.comfyUI.get_files(OUTPUT_DIR, file_extensions=["mp4"])
