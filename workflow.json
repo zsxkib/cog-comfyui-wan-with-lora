@@ -1,4 +1,3 @@
-
 {
   "3": {
     "inputs": {
@@ -133,7 +132,7 @@
       "strength_model": 1,
       "strength_clip": 1,
       "model": [
-        "37",
+        "54",
         0
       ],
       "clip": [
@@ -166,6 +165,40 @@
     "class_type": "VHS_VideoCombine",
     "_meta": {
       "title": "Video Combine 🎥🅥🅗🅢"
+    }
+  },
+  "53": {
+    "inputs": {
+      "weight": 0.2,
+      "model": [
+        "37",
+        0
+      ],
+      "latent": [
+        "40",
+        0
+      ]
+    },
+    "class_type": "WanVideoEnhanceAVideoKJ",
+    "_meta": {
+      "title": "WanVideo Enhance A Video (native)"
+    }
+  },
+  "54": {
+    "inputs": {
+      "rel_l1_thresh": 0.19,
+      "start_percent": 0.1,
+      "end_percent": 1,
+      "cache_device": "offload_device",
+      "coefficients": "14B",
+      "model": [
+        "53",
+        0
+      ]
+    },
+    "class_type": "WanVideoTeaCacheKJ",
+    "_meta": {
+      "title": "WanVideo Tea Cache (native)"
     }
   }
 }

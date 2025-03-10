@@ -82,7 +82,7 @@ class Predictor(BasePredictor):
         else:
             del workflow["49"]
             positive_prompt["clip"] = ["38", 0]
-            shift["model"] = ["37", 0]
+            shift["model"] = ["54", 0]
 
     def predict(
         self,
