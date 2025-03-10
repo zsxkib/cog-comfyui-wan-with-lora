@@ -1,6 +1,3 @@
-# An example of how to convert a given API workflow into its own Replicate model
-# Replace predict.py with this file when building your own workflow
-
 import os
 import mimetypes
 import json
@@ -8,7 +5,6 @@ import shutil
 from typing import List
 from cog import BasePredictor, Input, Path
 from comfyui import ComfyUI
-from cog_model_helpers import optimise_images
 from cog_model_helpers import seed as seed_helper
 
 OUTPUT_DIR = "/tmp/outputs"
@@ -17,9 +13,7 @@ COMFYUI_TEMP_OUTPUT_DIR = "ComfyUI/temp"
 ALL_DIRECTORIES = [OUTPUT_DIR, INPUT_DIR, COMFYUI_TEMP_OUTPUT_DIR]
 
 mimetypes.add_type("image/webp", ".webp")
-
-# Save your example JSON to the same directory as predict.py
-api_json_file = "workflow_api.json"
+api_json_file = "workflow.json"
 
 # Force HF offline
 os.environ["HF_DATASETS_OFFLINE"] = "1"
@@ -31,12 +25,16 @@ class Predictor(BasePredictor):
         self.comfyUI = ComfyUI("127.0.0.1:8188")
         self.comfyUI.start_server(OUTPUT_DIR, INPUT_DIR)
 
-        # Give a list of weights filenames to download during setup
         with open(api_json_file, "r") as file:
             workflow = json.loads(file.read())
         self.comfyUI.handle_weights(
             workflow,
-            weights_to_download=[],
+            weights_to_download=[
+                "wan2.1_t2v_1.3B_bf16.safetensors",
+                "wan2.1_t2v_14B_bf16.safetensors",
+                "wan_2.1_vae.safetensors",
+                "umt5_xxl_fp16.safetensors",
+            ],
         )
 
     def filename_with_extension(self, input_file, prefix):
@@ -50,19 +48,45 @@ class Predictor(BasePredictor):
     ):
         shutil.copy(input_file, os.path.join(INPUT_DIR, filename))
 
-    # Update nodes in the JSON workflow to modify your workflow based on the given inputs
     def update_workflow(self, workflow, **kwargs):
-        # Below is an example showing how to get the node you need and update the inputs
+        empty_latent_video = workflow["40"]["inputs"]
+        empty_latent_video["length"] = kwargs["frames"]
+        if kwargs["aspect_ratio"] == "16:9":
+            empty_latent_video["width"] = 832
+            empty_latent_video["height"] = 480
+        elif kwargs["aspect_ratio"] == "9:16":
+            empty_latent_video["width"] = 480
+            empty_latent_video["height"] = 832
 
-        # positive_prompt = workflow["6"]["inputs"]
-        # positive_prompt["text"] = kwargs["prompt"]
+        model_loader = workflow["37"]["inputs"]
+        if kwargs["model"] == "1.3b":
+            model_loader["unet_name"] = "wan2.1_t2v_1.3B_bf16.safetensors"
+        elif kwargs["model"] == "14b":
+            model_loader["unet_name"] = "wan2.1_t2v_14B_bf16.safetensors"
 
-        # negative_prompt = workflow["7"]["inputs"]
-        # negative_prompt["text"] = f"nsfw, {kwargs['negative_prompt']}"
+        positive_prompt = workflow["6"]["inputs"]
+        positive_prompt["text"] = kwargs["prompt"]
 
-        # sampler = workflow["3"]["inputs"]
-        # sampler["seed"] = kwargs["seed"]
-        pass
+        negative_prompt = workflow["7"]["inputs"]
+        negative_prompt["text"] = f"nsfw, {kwargs['negative_prompt']}"
+
+        sampler = workflow["3"]["inputs"]
+        sampler["seed"] = kwargs["seed"]
+        sampler["cfg"] = kwargs["sample_guide_scale"]
+        sampler["steps"] = kwargs["sample_steps"]
+
+        shift = workflow["48"]["inputs"]
+        shift["shift"] = kwargs["sample_shift"]
+
+        if kwargs["lora_url"]:
+            lora_loader = workflow["49"]["inputs"]
+            lora_loader["lora_name"] = kwargs["lora_url"]
+            lora_loader["strength_model"] = kwargs["lora_strength_model"]
+            lora_loader["strength_clip"] = kwargs["lora_strength_clip"]
+        else:
+            del workflow["49"]
+            positive_prompt["clip"] = ["38", 0]
+            shift["model"] = ["37", 0]
 
     def predict(
         self,
@@ -73,24 +97,55 @@ class Predictor(BasePredictor):
             description="Things you do not want to see in your image",
             default="",
         ),
-        image: Path = Input(
-            description="An input image",
+        aspect_ratio: str = Input(
+            description="The aspect ratio of the image. 16:9, 9:16, 1:1, etc.",
+            choices=["16:9", "9:16", "1:1"],
+            default="16:9",
+        ),
+        frames: int = Input(
+            description="The number of frames to generate (1 to 5 seconds)",
+            choices=[17, 33, 49, 65, 81],
+            default=81,
+        ),
+        model: str = Input(
+            description="The model to use. 1.3b is faster, but 14b is better quality. A LORA either works with 1.3b or 14b, depending on the version if was trained on.",
+            choices=["1.3b", "14b"],
+            default="14b",
+        ),
+        lora_url: str = Input(
+            description="Optional: The URL of a LORA to use",
             default=None,
         ),
-        output_format: str = optimise_images.predict_output_format(),
-        output_quality: int = optimise_images.predict_output_quality(),
+        lora_strength_model: float = Input(
+            description="Strength of the LORA applied to the model. 1.0 is the default strength. 0.0 is no LORA.",
+            default=1.0,
+        ),
+        lora_strength_clip: float = Input(
+            description="Strength of the LORA applied to the CLIP model. 1.0 is the default strength. 0.0 is no LORA.",
+            default=1.0,
+        ),
+        sample_shift: float = Input(
+            description="Sample shift factor",
+            default=8.0,
+            ge=0.0,
+            le=10.0,
+        ),
+        sample_guide_scale: float = Input(
+            description="Higher guide scale makes prompt adherence better, but can reduce variation",
+            default=5.0,
+            ge=0.0,
+            le=10.0,
+        ),
+        sample_steps: int = Input(
+            description="Number of generation steps. Fewer steps means faster generation, at the expensive of output quality. 30 steps is sufficient for most prompts",
+            default=30,
+            ge=1,
+            le=60,
+        ),
         seed: int = seed_helper.predict_seed(),
     ) -> List[Path]:
-        """Run a single prediction on the model"""
         self.comfyUI.cleanup(ALL_DIRECTORIES)
-
-        # Make sure to set the seeds in your workflow
         seed = seed_helper.generate(seed)
-
-        image_filename = None
-        if image:
-            image_filename = self.filename_with_extension(image, "image")
-            self.handle_input_file(image, image_filename)
 
         with open(api_json_file, "r") as file:
             workflow = json.loads(file.read())
@@ -99,14 +154,20 @@ class Predictor(BasePredictor):
             workflow,
             prompt=prompt,
             negative_prompt=negative_prompt,
-            image_filename=image_filename,
             seed=seed,
+            sample_shift=sample_shift,
+            sample_guide_scale=sample_guide_scale,
+            sample_steps=sample_steps,
+            model=model,
+            frames=frames,
+            aspect_ratio=aspect_ratio,
+            lora_url=lora_url,
+            lora_strength_model=lora_strength_model,
+            lora_strength_clip=lora_strength_clip,
         )
 
         wf = self.comfyUI.load_workflow(workflow)
         self.comfyUI.connect()
         self.comfyUI.run_workflow(wf)
 
-        return optimise_images.optimise_image_files(
-            output_format, output_quality, self.comfyUI.get_files(OUTPUT_DIR)
-        )
+        return self.comfyUI.get_files(OUTPUT_DIR, "mp4")

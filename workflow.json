@@ -84,7 +84,7 @@
   },
   "38": {
     "inputs": {
-      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "clip_name": "umt5_xxl_fp16.safetensors",
       "type": "wan",
       "device": "default"
     },
@@ -129,7 +129,7 @@
   },
   "49": {
     "inputs": {
-      "lora_name": "wan14b-shoxin.safetensors",
+      "lora_name": "",
       "strength_model": 1,
       "strength_clip": 1,
       "model": [
