@@ -21,8 +21,8 @@ os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 @dataclass
 class Inputs:
     prompt = Input(description="Text prompt for video generation")
-    negative_prompt = Input(description="Things you do not want to see in your image", default="")
-    aspect_ratio = Input(description="The aspect ratio of the image. 16:9, 9:16, 1:1, etc.", choices=["16:9", "9:16", "1:1"], default="16:9")
+    negative_prompt = Input(description="Things you do not want to see in your video", default="")
+    aspect_ratio = Input(description="The aspect ratio of the video. 16:9, 9:16, 1:1, etc.", choices=["16:9", "9:16", "1:1"], default="16:9")
     frames = Input(description="The number of frames to generate (1 to 5 seconds)", choices=[17, 33, 49, 65, 81], default=81)
     model = Input(description="The model to use. 1.3b is faster, but 14b is better quality. A LORA either works with 1.3b or 14b, depending on the version it was trained on.", choices=["1.3b", "14b"], default="14b")
     lora_url = Input(description="Optional: The URL of a LORA to use", default=None)
