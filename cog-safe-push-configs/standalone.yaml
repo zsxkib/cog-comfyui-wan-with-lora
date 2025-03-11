@@ -1,5 +1,5 @@
 # Live model
-model: fofr/wan-2.1-with-lora
+model: fofr/wan2.1-with-lora
 test_model: fofr/staging
 
 # Tests
