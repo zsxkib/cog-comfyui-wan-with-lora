@@ -55,5 +55,6 @@ jobs:
           echo "=== Pushing $model"
           echo "==="
           echo "==="
+          ./script/select-model $model
           cog-safe-push --config cog-safe-push-configs/$model.yaml -vv
         done
