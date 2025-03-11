@@ -7,6 +7,7 @@ from cog import BasePredictor, Input, Path
 from comfyui import ComfyUI
 from cog_model_helpers import seed as seed_helper
 from replicate_weights import download_replicate_weights
+from dataclasses import dataclass
 
 OUTPUT_DIR = "/tmp/outputs"
 INPUT_DIR = "/tmp/inputs"
@@ -126,7 +127,7 @@ class Predictor(BasePredictor):
 
         lora_filename = None
         if replicate_weights:
-            lora_filename = download_replicate_weights(replicate_weights, Path("ComfyUI/models/loras"))
+            lora_filename = download_replicate_weights(replicate_weights, "ComfyUI/models/loras")
 
         with open(api_json_file, "r") as file:
             workflow = json.loads(file.read())
@@ -169,7 +170,7 @@ class StandaloneLoraPredictor(Predictor):
             sample_steps: int = Inputs.sample_steps,
             seed: int = seed_helper.predict_seed(),
         ) -> List[Path]:
-        return super().predict(
+        return self.generate(
             prompt=prompt,
             negative_prompt=negative_prompt,
             aspect_ratio=aspect_ratio,
@@ -199,7 +200,7 @@ class Trained14BLoraPredictor(Predictor):
             seed: int = seed_helper.predict_seed(),
             replicate_weights: str = Inputs.replicate_weights,
         ) -> List[Path]:
-        return super().predict(
+        return self.generate(
             prompt=prompt,
             negative_prompt=negative_prompt,
             aspect_ratio=aspect_ratio,

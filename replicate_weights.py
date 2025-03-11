@@ -10,7 +10,7 @@ def get_filename_from_url(url: str, extension: str) -> str:
     filename = hashlib.md5(url.encode()).hexdigest()
     return f"{filename}.{extension}"
 
-def download_replicate_weights(url: str, path: Path):
+def download_replicate_weights(url: str, lora_dir: str):
     """Downloads weights from a Replicate tarball URL and extracts the safetensors file"""
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_dir = Path(temp_dir)
@@ -21,7 +21,6 @@ def download_replicate_weights(url: str, path: Path):
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Failed to download tarball: {e}")
 
-        # Find safetensors file
         safetensors_paths = []
         for root, _, files in os.walk(extract_dir):
             root = Path(root)
@@ -35,9 +34,8 @@ def download_replicate_weights(url: str, path: Path):
         if len(safetensors_paths) > 1:
             raise ValueError("Multiple .safetensors files found in tarball")
 
-        # Generate unique filename based on URL and move the file
         unique_filename = get_filename_from_url(url, "safetensors")
-        target_path = path.parent / unique_filename
+        target_path = Path(lora_dir) / unique_filename
         shutil.move(safetensors_paths[0], target_path)
 
     return unique_filename
