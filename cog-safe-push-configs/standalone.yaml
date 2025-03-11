@@ -1,9 +1,6 @@
 # Live model
 model: fofr/wan-2.1-with-lora
-
-# A private model to run the tests against before pushing
 test_model: fofr/staging
-test_hardware: gpu-l40s
 
 # Tests
 predict:
