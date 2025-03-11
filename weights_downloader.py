@@ -46,9 +46,14 @@ class WeightsDownloader:
                     self.weights_map[weight_str]["dest"],
                 )
         else:
-            raise ValueError(
-                f"{weight_str} unavailable. View the list of available weights: https://github.com/replicate/cog-comfyui/blob/main/supported_weights.md"
-            )
+            filename = os.path.basename(weight_str)
+            lora_path = os.path.join("ComfyUI/models/loras", filename)
+            if os.path.exists(lora_path):
+                print(f"✅ {filename} exists in loras directory")
+            else:
+                raise ValueError(
+                    f"{weight_str} unavailable. View the list of available weights: https://github.com/replicate/cog-comfyui/blob/main/supported_weights.md"
+                )
 
     def check_if_file_exists(self, weight_str, dest):
         if dest.endswith(weight_str):

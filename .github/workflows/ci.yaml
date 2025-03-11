@@ -2,6 +2,11 @@ name: Push
 
 on:
   workflow_dispatch:
+    inputs:
+      models:
+        description: 'Comma-separated list of models (standalone, trained14b) to push or "all"'
+        type: string
+        default: 'all'
 
 jobs:
   cog-safe-push:
@@ -38,4 +43,17 @@ jobs:
       env:
         REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
       run: |
-        cog-safe-push --config cog-safe-push-configs/default.yaml -vv
+        if [ "${{ inputs.models }}" = "all" ]; then
+          models="standalone trained14b"
+        else
+          models="${{ inputs.models }}"
+        fi
+
+        for model in ${models//,/ }; do
+          echo "==="
+          echo "==="
+          echo "=== Pushing $model"
+          echo "==="
+          echo "==="
+          cog-safe-push --config cog-safe-push-configs/$model.yaml -vv
+        done

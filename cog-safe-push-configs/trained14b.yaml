@@ -1,0 +1,19 @@
+# Live model
+model: replicate/wan-2.1-14b-hotswap-lora-internal
+
+# A private model to run the tests against before pushing
+test_model: replicate/wan-2.1-14b-hotswap-lora-internal-test
+test_hardware: gpu-h100
+
+# Tests
+predict:
+  compare_outputs: false
+  predict_timeout: 600
+  test_cases:
+    - inputs:
+        prompt: "a LAEZEL portrait painting"
+        replicate_weights: "https://replicate.delivery/xezq/begAR055rwyeb0sjY60xM01L9i2fJ8T11ofpHGfL6PCEYf2FF/trained_model.tar"
+    - inputs:
+        prompt: "a MNCRFTMOV cat"
+        model: "1.3b"
+        lora_url: "https://huggingface.co/fofr/wan2.1-test-loras/resolve/main/wan2.1-1.3b-minecraft-movie.safetensors?download=true"

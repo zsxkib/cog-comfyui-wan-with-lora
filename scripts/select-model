@@ -1,0 +1,46 @@
+#!/bin/bash
+set -eu
+set -o pipefail
+
+function list_models {
+    ls cog-safe-push-configs | sed 's/.yaml//' | sed 's/^/- /'
+}
+
+function usage {
+    echo "Usage:"
+    echo "  ./script/select-model <model>"
+    echo
+    echo "Valid models are:"
+    echo
+    list_models
+    echo
+    echo "To see all models: ./script/select-model --list"
+    exit 1
+}
+
+# Show usage if no params
+if [ $# -eq 0 ]; then
+    usage
+fi
+
+if [[ $1 == --list ]]; then
+    list_models
+    exit 0
+fi
+
+SCRIPT_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MODEL=$1
+
+# Set the predictor name
+if [[ "$MODEL" == "standalone" ]]; then
+    export PREDICTOR=StandaloneLoraPredictor
+elif [[ "$MODEL" == "trained14b" ]]; then
+    export PREDICTOR=Trained14BLoraPredictor
+else
+    echo "Unknown model: $MODEL. Valid models are:"
+    list_models
+    exit 0
+fi
+
+# Replace the predictor name in the cog.yaml template
+envsubst < cog.yaml.tpl > cog.yaml

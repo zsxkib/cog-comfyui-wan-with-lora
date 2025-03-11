@@ -1,0 +1,24 @@
+# Live model
+model: fofr/wan-2.1-with-lora
+
+# A private model to run the tests against before pushing
+test_model: fofr/staging
+test_hardware: gpu-l40s
+
+# Tests
+predict:
+  compare_outputs: false
+  predict_timeout: 600
+  test_cases:
+    - inputs:
+        prompt: "a MNCRFTMOV cat"
+        model: "14b"
+        steps: 15
+        lora_url: "https://huggingface.co/fofr/wan2.1-test-loras/resolve/main/wan2.1-14b-minecraft-movie.safetensors"
+    - inputs:
+        prompt: "a MNCRFTMOV cat"
+        model: "1.3b"
+        lora_url: "https://huggingface.co/fofr/wan2.1-test-loras/resolve/main/wan2.1-1.3b-minecraft-movie.safetensors?download=true"
+    - inputs:
+        prompt: "a MNCRFTMOV cat without a lora"
+        model: "1.3b"
