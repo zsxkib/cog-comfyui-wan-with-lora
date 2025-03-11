@@ -12,6 +12,13 @@ def get_filename_from_url(url: str, extension: str) -> str:
 
 def download_replicate_weights(url: str, lora_dir: str):
     """Downloads weights from a Replicate tarball URL and extracts the safetensors file"""
+    unique_filename = get_filename_from_url(url, "safetensors")
+    target_path = Path(lora_dir) / unique_filename
+
+    if target_path.exists():
+        print(f"✅ {unique_filename} already cached")
+        return unique_filename
+
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_dir = Path(temp_dir)
         extract_dir = temp_dir / "weights"
@@ -34,8 +41,6 @@ def download_replicate_weights(url: str, lora_dir: str):
         if len(safetensors_paths) > 1:
             raise ValueError("Multiple .safetensors files found in tarball")
 
-        unique_filename = get_filename_from_url(url, "safetensors")
-        target_path = Path(lora_dir) / unique_filename
         shutil.move(safetensors_paths[0], target_path)
 
     return unique_filename

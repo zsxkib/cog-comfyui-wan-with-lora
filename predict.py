@@ -39,6 +39,8 @@ class Predictor(BasePredictor):
         self.comfyUI = ComfyUI("127.0.0.1:8188")
         self.comfyUI.start_server(OUTPUT_DIR, INPUT_DIR)
 
+        os.makedirs("ComfyUI/models/loras", exist_ok=True)
+
         with open(api_json_file, "r") as file:
             workflow = json.loads(file.read())
         self.comfyUI.handle_weights(
