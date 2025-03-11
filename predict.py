@@ -92,6 +92,10 @@ class Predictor(BasePredictor):
         shift = workflow["48"]["inputs"]
         shift["shift"] = kwargs["sample_shift"]
 
+        tea_cache = workflow["54"]["inputs"]
+        tea_cache["coefficients"] = "14B" if kwargs["model"] == "14b" else "1.3B"
+        tea_cache["rel_l1_thresh"] = 0.15 if kwargs["model"] == "14b" else 0.07
+
         if kwargs["lora_url"] or kwargs["lora_filename"]:
             lora_loader = workflow["49"]["inputs"]
             if kwargs["lora_filename"]:
