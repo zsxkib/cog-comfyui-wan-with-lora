@@ -2,6 +2,7 @@ import os
 import mimetypes
 import json
 import shutil
+import re
 from typing import List
 from cog import BasePredictor, Input, Path
 from comfyui import ComfyUI
@@ -165,7 +166,23 @@ class Predictor(BasePredictor):
             if kwargs["lora_filename"]:
                 lora_loader["lora_name"] = kwargs["lora_filename"]
             elif kwargs["lora_url"]:
-                lora_loader["lora_name"] = kwargs["lora_url"]
+                url = kwargs["lora_url"]
+                if m := re.match(
+                    r"^(?:https?://replicate.com/)?([^/]+)/([^/]+)/?$", url
+                ):
+                    owner, model_name = m.groups()
+                    lora_filename = download_replicate_weights(
+                        f"https://replicate.com/{owner}/{model_name}/_weights",
+                        "ComfyUI/models/loras",
+                    )
+                    lora_loader["lora_name"] = lora_filename
+                elif url.startswith("https://replicate.delivery"):
+                    lora_filename = download_replicate_weights(
+                        url, "ComfyUI/models/loras"
+                    )
+                    lora_loader["lora_name"] = lora_filename
+                else:
+                    lora_loader["lora_name"] = url
 
             lora_loader["strength_model"] = kwargs["lora_strength_model"]
             lora_loader["strength_clip"] = kwargs["lora_strength_clip"]
