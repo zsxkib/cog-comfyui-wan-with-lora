@@ -208,6 +208,7 @@ class Predictor(BasePredictor):
             prompt=prompt,
             negative_prompt=negative_prompt,
             seed=seed,
+            fast_mode=fast_mode,
             sample_shift=sample_shift,
             sample_guide_scale=sample_guide_scale,
             sample_steps=sample_steps,
