@@ -75,6 +75,10 @@ class Inputs:
         choices=["Off", "Balanced", "Fast"],
         default="Balanced",
     )
+    resolution = Input(
+        choices=["480p", "720p"],
+        default="480p",
+    )
 
 
 class Predictor(BasePredictor):
@@ -107,18 +111,33 @@ class Predictor(BasePredictor):
     ):
         shutil.copy(input_file, os.path.join(INPUT_DIR, filename))
 
+    def get_width_and_height(self, resolution: str, aspect_ratio: str):
+        sizes = {
+            "480p": {
+                "16:9": (832, 480),
+                "9:16": (480, 832),
+                "1:1": (644, 644),
+            },
+            "720p": {
+                "16:9": (1280, 720),
+                "9:16": (720, 1280),
+                "1:1": (980, 980),
+            },
+        }
+        return sizes[resolution][aspect_ratio]
+
     def update_workflow(self, workflow, **kwargs):
         model = kwargs["model"]
         is_14b = model == "14b"
 
         empty_latent_video = workflow["40"]["inputs"]
         empty_latent_video["length"] = kwargs["frames"]
-        if kwargs["aspect_ratio"] == "16:9":
-            empty_latent_video["width"] = 832
-            empty_latent_video["height"] = 480
-        elif kwargs["aspect_ratio"] == "9:16":
-            empty_latent_video["width"] = 480
-            empty_latent_video["height"] = 832
+
+        width, height = self.get_width_and_height(
+            kwargs["resolution"], kwargs["aspect_ratio"]
+        )
+        empty_latent_video["width"] = width
+        empty_latent_video["height"] = height
 
         model_loader = workflow["37"]["inputs"]
         if is_14b:
@@ -206,10 +225,15 @@ class Predictor(BasePredictor):
         sample_guide_scale: float = 5.0,
         sample_steps: int = 30,
         seed: int | None = None,
+        resolution: str = "480p",
         replicate_weights: str | None = None,
     ) -> List[Path]:
         self.comfyUI.cleanup(ALL_DIRECTORIES)
         seed = seed_helper.generate(seed)
+
+        if resolution == "720p" and model == "1.3b":
+            print("Warning: 720p is not supported for 1.3b, using 480p instead")
+            resolution = "480p"
 
         lora_filename = None
         if replicate_weights:
@@ -236,6 +260,7 @@ class Predictor(BasePredictor):
             lora_url=lora_url,
             lora_strength_model=lora_strength_model,
             lora_strength_clip=lora_strength_clip,
+            resolution=resolution,
         )
 
         wf = self.comfyUI.load_workflow(workflow)
@@ -253,6 +278,7 @@ class StandaloneLoraPredictor(Predictor):
         aspect_ratio: str = Inputs.aspect_ratio,
         frames: int = Inputs.frames,
         model: str = Inputs.model,
+        resolution: str = Inputs.resolution,
         lora_url: str = Inputs.lora_url,
         lora_strength_model: float = Inputs.lora_strength_model,
         lora_strength_clip: float = Inputs.lora_strength_clip,
@@ -268,6 +294,7 @@ class StandaloneLoraPredictor(Predictor):
             aspect_ratio=aspect_ratio,
             frames=frames,
             model=model,
+            resolution=resolution,
             lora_url=lora_url,
             lora_strength_model=lora_strength_model,
             lora_strength_clip=lora_strength_clip,
@@ -289,6 +316,7 @@ class Trained14BLoraPredictor(Predictor):
         negative_prompt: str = Inputs.negative_prompt,
         aspect_ratio: str = Inputs.aspect_ratio,
         frames: int = Inputs.frames,
+        resolution: str = Inputs.resolution,
         lora_strength_model: float = Inputs.lora_strength_model,
         lora_strength_clip: float = Inputs.lora_strength_clip,
         fast_mode: str = Inputs.fast_mode,
@@ -304,6 +332,7 @@ class Trained14BLoraPredictor(Predictor):
             aspect_ratio=aspect_ratio,
             frames=frames,
             model=self.model,
+            resolution=resolution,
             lora_url=None,
             lora_strength_model=lora_strength_model,
             lora_strength_clip=lora_strength_clip,

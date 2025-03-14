@@ -10,11 +10,15 @@ predict:
     - inputs:
         prompt: "a MNCRFTMOV cat"
         model: "14b"
+        aspect_ratio: "9:16"
+        resolution: "480p"
         steps: 15
         lora_url: "https://huggingface.co/fofr/wan2.1-test-loras/resolve/main/wan2.1-14b-minecraft-movie.safetensors"
     - inputs:
         prompt: "a LAEZEL woman is riding a horse"
         model: "14b"
+        resolution: "720p"
+        aspect_ratio: "1:1"
         steps: 30
         fast_mode: "Fast"
         lora_url: "https://replicate.delivery/xezq/begAR055rwyeb0sjY60xM01L9i2fJ8T11ofpHGfL6PCEYf2FF/trained_model.tar"
