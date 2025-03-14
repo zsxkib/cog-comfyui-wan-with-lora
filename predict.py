@@ -18,21 +18,63 @@ mimetypes.add_type("image/webp", ".webp")
 api_json_file = "workflow.json"
 os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
+
 @dataclass
 class Inputs:
     prompt = Input(description="Text prompt for video generation")
-    negative_prompt = Input(description="Things you do not want to see in your video", default="")
-    aspect_ratio = Input(description="The aspect ratio of the video. 16:9, 9:16, 1:1, etc.", choices=["16:9", "9:16", "1:1"], default="16:9")
-    frames = Input(description="The number of frames to generate (1 to 5 seconds)", choices=[17, 33, 49, 65, 81], default=81)
-    model = Input(description="The model to use. 1.3b is faster, but 14b is better quality. A LORA either works with 1.3b or 14b, depending on the version it was trained on.", choices=["1.3b", "14b"], default="14b")
+    negative_prompt = Input(
+        description="Things you do not want to see in your video", default=""
+    )
+    aspect_ratio = Input(
+        description="The aspect ratio of the video. 16:9, 9:16, 1:1, etc.",
+        choices=["16:9", "9:16", "1:1"],
+        default="16:9",
+    )
+    frames = Input(
+        description="The number of frames to generate (1 to 5 seconds)",
+        choices=[17, 33, 49, 65, 81],
+        default=81,
+    )
+    model = Input(
+        description="The model to use. 1.3b is faster, but 14b is better quality. A LORA either works with 1.3b or 14b, depending on the version it was trained on.",
+        choices=["1.3b", "14b"],
+        default="14b",
+    )
     lora_url = Input(description="Optional: The URL of a LORA to use", default=None)
-    lora_strength_model = Input(description="Strength of the LORA applied to the model. 0.0 is no LORA.", default=1.0)
-    lora_strength_clip = Input(description="Strength of the LORA applied to the CLIP model. 0.0 is no LORA.", default=1.0)
-    sample_shift = Input(description="Sample shift factor", default=8.0, ge=0.0, le=10.0)
-    sample_guide_scale = Input(description="Higher guide scale makes prompt adherence better, but can reduce variation", default=5.0, ge=0.0, le=10.0)
-    sample_steps = Input(description="Number of generation steps. Fewer steps means faster generation, at the expensive of output quality. 30 steps is sufficient for most prompts", default=30, ge=1, le=60)
+    lora_strength_model = Input(
+        description="Strength of the LORA applied to the model. 0.0 is no LORA.",
+        default=1.0,
+    )
+    lora_strength_clip = Input(
+        description="Strength of the LORA applied to the CLIP model. 0.0 is no LORA.",
+        default=1.0,
+    )
+    sample_shift = Input(
+        description="Sample shift factor", default=8.0, ge=0.0, le=10.0
+    )
+    sample_guide_scale = Input(
+        description="Higher guide scale makes prompt adherence better, but can reduce variation",
+        default=5.0,
+        ge=0.0,
+        le=10.0,
+    )
+    sample_steps = Input(
+        description="Number of generation steps. Fewer steps means faster generation, at the expensive of output quality. 30 steps is sufficient for most prompts",
+        default=30,
+        ge=1,
+        le=60,
+    )
     seed = Input(default=seed_helper.predict_seed())
-    replicate_weights = Input(description="Replicate LoRA weights to use. Leave blank to use the default weights.", default=None)
+    replicate_weights = Input(
+        description="Replicate LoRA weights to use. Leave blank to use the default weights.",
+        default=None,
+    )
+    fast_mode = Input(
+        description="Speed up generation with different levels of acceleration. Faster modes may degrade quality somewhat. The speedup is dependent on the content, so different videos may see different speedups.",
+        choices=["Off", "Balanced", "Fast"],
+        default="Balanced",
+    )
+
 
 class Predictor(BasePredictor):
     def setup(self):
@@ -65,6 +107,9 @@ class Predictor(BasePredictor):
         shutil.copy(input_file, os.path.join(INPUT_DIR, filename))
 
     def update_workflow(self, workflow, **kwargs):
+        model = kwargs["model"]
+        is_14b = model == "14b"
+
         empty_latent_video = workflow["40"]["inputs"]
         empty_latent_video["length"] = kwargs["frames"]
         if kwargs["aspect_ratio"] == "16:9":
@@ -75,10 +120,10 @@ class Predictor(BasePredictor):
             empty_latent_video["height"] = 832
 
         model_loader = workflow["37"]["inputs"]
-        if kwargs["model"] == "1.3b":
-            model_loader["unet_name"] = "wan2.1_t2v_1.3B_bf16.safetensors"
-        elif kwargs["model"] == "14b":
+        if is_14b:
             model_loader["unet_name"] = "wan2.1_t2v_14B_bf16.safetensors"
+        else:
+            model_loader["unet_name"] = "wan2.1_t2v_1.3B_bf16.safetensors"
 
         positive_prompt = workflow["6"]["inputs"]
         positive_prompt["text"] = kwargs["prompt"]
@@ -94,9 +139,26 @@ class Predictor(BasePredictor):
         shift = workflow["48"]["inputs"]
         shift["shift"] = kwargs["sample_shift"]
 
-        tea_cache = workflow["54"]["inputs"]
-        tea_cache["coefficients"] = "14B" if kwargs["model"] == "14b" else "1.3B"
-        tea_cache["rel_l1_thresh"] = 0.15 if kwargs["model"] == "14b" else 0.07
+        thresholds = {
+            "14b": {
+                "Balanced": 0.15,
+                "Fast": 0.2,
+            },
+            "1.3b": {
+                "Balanced": 0.07,
+                "Fast": 0.08,
+            },
+        }
+
+        fast_mode = kwargs["fast_mode"]
+        if fast_mode == "Off":
+            # Turn off tea cache
+            del workflow["54"]
+            workflow["49"]["inputs"]["model"] = ["53", 0]
+        else:
+            tea_cache = workflow["54"]["inputs"]
+            tea_cache["coefficients"] = "14B" if is_14b else "1.3B"
+            tea_cache["rel_l1_thresh"] = thresholds[model][fast_mode]
 
         if kwargs["lora_url"] or kwargs["lora_filename"]:
             lora_loader = workflow["49"]["inputs"]
@@ -108,9 +170,9 @@ class Predictor(BasePredictor):
             lora_loader["strength_model"] = kwargs["lora_strength_model"]
             lora_loader["strength_clip"] = kwargs["lora_strength_clip"]
         else:
-            del workflow["49"]
+            del workflow["49"]  # delete lora loader node
             positive_prompt["clip"] = ["38", 0]
-            shift["model"] = ["54", 0]
+            shift["model"] = ["53", 0] if fast_mode == "Off" else ["54", 0]
 
     def generate(
         self,
@@ -122,6 +184,7 @@ class Predictor(BasePredictor):
         lora_url: str | None = None,
         lora_strength_model: float = 1.0,
         lora_strength_clip: float = 1.0,
+        fast_mode: str = "Balanced",
         sample_shift: float = 8.0,
         sample_guide_scale: float = 5.0,
         sample_steps: int = 30,
@@ -133,7 +196,9 @@ class Predictor(BasePredictor):
 
         lora_filename = None
         if replicate_weights:
-            lora_filename = download_replicate_weights(replicate_weights, "ComfyUI/models/loras")
+            lora_filename = download_replicate_weights(
+                replicate_weights, "ComfyUI/models/loras"
+            )
 
         with open(api_json_file, "r") as file:
             workflow = json.loads(file.read())
@@ -161,21 +226,24 @@ class Predictor(BasePredictor):
 
         return self.comfyUI.get_files(OUTPUT_DIR, file_extensions=["mp4"])
 
+
 class StandaloneLoraPredictor(Predictor):
-    def predict(self,
-            prompt: str = Inputs.prompt,
-            negative_prompt: str = Inputs.negative_prompt,
-            aspect_ratio: str = Inputs.aspect_ratio,
-            frames: int = Inputs.frames,
-            model: str = Inputs.model,
-            lora_url: str = Inputs.lora_url,
-            lora_strength_model: float = Inputs.lora_strength_model,
-            lora_strength_clip: float = Inputs.lora_strength_clip,
-            sample_shift: float = Inputs.sample_shift,
-            sample_guide_scale: float = Inputs.sample_guide_scale,
-            sample_steps: int = Inputs.sample_steps,
-            seed: int = seed_helper.predict_seed(),
-        ) -> List[Path]:
+    def predict(
+        self,
+        prompt: str = Inputs.prompt,
+        negative_prompt: str = Inputs.negative_prompt,
+        aspect_ratio: str = Inputs.aspect_ratio,
+        frames: int = Inputs.frames,
+        model: str = Inputs.model,
+        lora_url: str = Inputs.lora_url,
+        lora_strength_model: float = Inputs.lora_strength_model,
+        lora_strength_clip: float = Inputs.lora_strength_clip,
+        fast_mode: str = Inputs.fast_mode,
+        sample_steps: int = Inputs.sample_steps,
+        sample_guide_scale: float = Inputs.sample_guide_scale,
+        sample_shift: float = Inputs.sample_shift,
+        seed: int = seed_helper.predict_seed(),
+    ) -> List[Path]:
         return self.generate(
             prompt=prompt,
             negative_prompt=negative_prompt,
@@ -185,6 +253,7 @@ class StandaloneLoraPredictor(Predictor):
             lora_url=lora_url,
             lora_strength_model=lora_strength_model,
             lora_strength_clip=lora_strength_clip,
+            fast_mode=fast_mode,
             sample_shift=sample_shift,
             sample_guide_scale=sample_guide_scale,
             sample_steps=sample_steps,
@@ -192,22 +261,25 @@ class StandaloneLoraPredictor(Predictor):
             replicate_weights=None,
         )
 
+
 class Trained14BLoraPredictor(Predictor):
     model = "14b"
 
-    def predict(self,
-            prompt: str = Inputs.prompt,
-            negative_prompt: str = Inputs.negative_prompt,
-            aspect_ratio: str = Inputs.aspect_ratio,
-            frames: int = Inputs.frames,
-            lora_strength_model: float = Inputs.lora_strength_model,
-            lora_strength_clip: float = Inputs.lora_strength_clip,
-            sample_shift: float = Inputs.sample_shift,
-            sample_guide_scale: float = Inputs.sample_guide_scale,
-            sample_steps: int = Inputs.sample_steps,
-            seed: int = seed_helper.predict_seed(),
-            replicate_weights: str = Inputs.replicate_weights,
-        ) -> List[Path]:
+    def predict(
+        self,
+        prompt: str = Inputs.prompt,
+        negative_prompt: str = Inputs.negative_prompt,
+        aspect_ratio: str = Inputs.aspect_ratio,
+        frames: int = Inputs.frames,
+        lora_strength_model: float = Inputs.lora_strength_model,
+        lora_strength_clip: float = Inputs.lora_strength_clip,
+        fast_mode: str = Inputs.fast_mode,
+        sample_steps: int = Inputs.sample_steps,
+        sample_guide_scale: float = Inputs.sample_guide_scale,
+        sample_shift: float = Inputs.sample_shift,
+        seed: int = seed_helper.predict_seed(),
+        replicate_weights: str = Inputs.replicate_weights,
+    ) -> List[Path]:
         return self.generate(
             prompt=prompt,
             negative_prompt=negative_prompt,
@@ -217,12 +289,14 @@ class Trained14BLoraPredictor(Predictor):
             lora_url=None,
             lora_strength_model=lora_strength_model,
             lora_strength_clip=lora_strength_clip,
+            fast_mode=fast_mode,
             sample_shift=sample_shift,
             sample_guide_scale=sample_guide_scale,
             sample_steps=sample_steps,
             seed=seed,
             replicate_weights=replicate_weights,
         )
+
 
 class Trained1_3BLoraPredictor(Trained14BLoraPredictor):
     model = "1.3b"

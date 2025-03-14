@@ -19,3 +19,12 @@ predict:
     - inputs:
         prompt: "a MNCRFTMOV cat without a lora"
         model: "1.3b"
+        fast_mode: "Off"
+    - inputs:
+        prompt: "a MNCRFTMOV cat without a lora"
+        model: "1.3b"
+        fast_mode: "Balanced"
+    - inputs:
+        prompt: "a MNCRFTMOV cat without a lora"
+        model: "1.3b"
+        fast_mode: "Fast"
