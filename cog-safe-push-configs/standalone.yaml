@@ -5,7 +5,7 @@ test_model: fofr/staging
 # Tests
 predict:
   compare_outputs: false
-  predict_timeout: 600
+  predict_timeout: 1800
   test_cases:
     - inputs:
         prompt: "a MNCRFTMOV cat"

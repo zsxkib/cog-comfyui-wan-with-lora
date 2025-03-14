@@ -13,6 +13,7 @@ from dataclasses import dataclass
 OUTPUT_DIR = "/tmp/outputs"
 INPUT_DIR = "/tmp/inputs"
 COMFYUI_TEMP_OUTPUT_DIR = "ComfyUI/temp"
+COMFYUI_LORAS_DIR = "ComfyUI/models/loras"
 ALL_DIRECTORIES = [OUTPUT_DIR, INPUT_DIR, COMFYUI_TEMP_OUTPUT_DIR]
 
 mimetypes.add_type("image/webp", ".webp")
@@ -94,8 +95,6 @@ class Predictor(BasePredictor):
         self.comfyUI.handle_weights(
             workflow,
             weights_to_download=[
-                "wan2.1_t2v_1.3B_bf16.safetensors",
-                "wan2.1_t2v_14B_bf16.safetensors",
                 "wan_2.1_vae.safetensors",
                 "umt5_xxl_fp16.safetensors",
             ],
@@ -186,23 +185,7 @@ class Predictor(BasePredictor):
             if kwargs["lora_filename"]:
                 lora_loader["lora_name"] = kwargs["lora_filename"]
             elif kwargs["lora_url"]:
-                url = kwargs["lora_url"]
-                if m := re.match(
-                    r"^(?:https?://replicate.com/)?([^/]+)/([^/]+)/?$", url
-                ):
-                    owner, model_name = m.groups()
-                    lora_filename = download_replicate_weights(
-                        f"https://replicate.com/{owner}/{model_name}/_weights",
-                        "ComfyUI/models/loras",
-                    )
-                    lora_loader["lora_name"] = lora_filename
-                elif url.startswith("https://replicate.delivery"):
-                    lora_filename = download_replicate_weights(
-                        url, "ComfyUI/models/loras"
-                    )
-                    lora_loader["lora_name"] = lora_filename
-                else:
-                    lora_loader["lora_name"] = url
+                lora_loader["lora_name"] = kwargs["lora_url"]
 
             lora_loader["strength_model"] = kwargs["lora_strength_model"]
             lora_loader["strength_clip"] = kwargs["lora_strength_clip"]
@@ -233,11 +216,31 @@ class Predictor(BasePredictor):
         seed = seed_helper.generate(seed)
 
         lora_filename = None
+        inferred_model_type = None
         if replicate_weights:
-            lora_filename, model_type = download_replicate_weights(
-                replicate_weights, "ComfyUI/models/loras"
+            lora_filename, inferred_model_type = download_replicate_weights(
+                replicate_weights, COMFYUI_LORAS_DIR
             )
-            model = model_type
+            model = inferred_model_type
+        elif lora_url:
+            if m := re.match(
+                r"^(?:https?://replicate.com/)?([^/]+)/([^/]+)/?$", lora_url
+            ):
+                owner, model_name = m.groups()
+                lora_filename, inferred_model_type = download_replicate_weights(
+                    f"https://replicate.com/{owner}/{model_name}/_weights",
+                    COMFYUI_LORAS_DIR,
+                )
+            elif lora_url.startswith("https://replicate.delivery"):
+                lora_filename, inferred_model_type = download_replicate_weights(
+                    lora_url, COMFYUI_LORAS_DIR
+                )
+
+            if inferred_model_type and inferred_model_type != model:
+                print(
+                    f"Warning: Model type mismatch between requested model ({model}) and inferred model type ({inferred_model_type}). Using {inferred_model_type}."
+                )
+                model = inferred_model_type
 
         if resolution == "720p" and model == "1.3b":
             print("Warning: 720p is not supported for 1.3b, using 480p instead")

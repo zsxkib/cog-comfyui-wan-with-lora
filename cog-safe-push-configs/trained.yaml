@@ -8,5 +8,10 @@ predict:
   predict_timeout: 600
   test_cases:
     - inputs:
-        prompt: "a LAEZEL portrait painting"
+        prompt: "a 14b LAEZEL is laughing"
+        # url contains lora.safetensors, which defaults to 14b
         replicate_weights: "https://replicate.delivery/xezq/begAR055rwyeb0sjY60xM01L9i2fJ8T11ofpHGfL6PCEYf2FF/trained_model.tar"
+    - inputs:
+        prompt: "a 1.3b HOMER is laughing"
+        # url contains 1.3b-lora.safetensors, which defaults to 1.3b
+        replicate_weights: "https://replicate.delivery/xezq/7kXMcHfE8GwHZ6CU4TR2iTod20dPX8SerMCMrRn16efou1hRB/trained_model.tar"
