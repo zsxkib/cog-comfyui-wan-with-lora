@@ -34,10 +34,8 @@ MODEL=$1
 # Set the predictor name
 if [[ "$MODEL" == "standalone" ]]; then
     export PREDICTOR=StandaloneLoraPredictor
-elif [[ "$MODEL" == "trained14b" ]]; then
-    export PREDICTOR=Trained14BLoraPredictor
-elif [[ "$MODEL" == "trained1.3b" ]]; then
-    export PREDICTOR=Trained1_3BLoraPredictor
+elif [[ "$MODEL" == "trained" ]]; then
+    export PREDICTOR=TrainedLoraPredictor
 else
     echo "Unknown model: $MODEL. Valid models are:"
     list_models

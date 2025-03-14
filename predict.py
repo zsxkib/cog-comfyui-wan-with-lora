@@ -217,7 +217,7 @@ class Predictor(BasePredictor):
         negative_prompt: str | None = None,
         aspect_ratio: str = "16:9",
         frames: int = 81,
-        model: str = "14b",
+        model: str | None = None,
         lora_url: str | None = None,
         lora_strength_model: float = 1.0,
         lora_strength_clip: float = 1.0,
@@ -232,15 +232,16 @@ class Predictor(BasePredictor):
         self.comfyUI.cleanup(ALL_DIRECTORIES)
         seed = seed_helper.generate(seed)
 
+        lora_filename = None
+        if replicate_weights:
+            lora_filename, model_type = download_replicate_weights(
+                replicate_weights, "ComfyUI/models/loras"
+            )
+            model = model_type
+
         if resolution == "720p" and model == "1.3b":
             print("Warning: 720p is not supported for 1.3b, using 480p instead")
             resolution = "480p"
-
-        lora_filename = None
-        if replicate_weights:
-            lora_filename = download_replicate_weights(
-                replicate_weights, "ComfyUI/models/loras"
-            )
 
         with open(api_json_file, "r") as file:
             workflow = json.loads(file.read())
@@ -308,9 +309,7 @@ class StandaloneLoraPredictor(Predictor):
         )
 
 
-class Trained14BLoraPredictor(Predictor):
-    model = "14b"
-
+class TrainedLoraPredictor(Predictor):
     def predict(
         self,
         prompt: str = Inputs.prompt,
@@ -332,7 +331,7 @@ class Trained14BLoraPredictor(Predictor):
             negative_prompt=negative_prompt,
             aspect_ratio=aspect_ratio,
             frames=frames,
-            model=self.model,
+            model=None,
             resolution=resolution,
             lora_url=None,
             lora_strength_model=lora_strength_model,
@@ -344,7 +343,3 @@ class Trained14BLoraPredictor(Predictor):
             seed=seed,
             replicate_weights=replicate_weights,
         )
-
-
-class Trained1_3BLoraPredictor(Trained14BLoraPredictor):
-    model = "1.3b"
