@@ -193,6 +193,8 @@ class StandaloneLoraPredictor(Predictor):
         )
 
 class Trained14BLoraPredictor(Predictor):
+    model = "14b"
+
     def predict(self,
             prompt: str = Inputs.prompt,
             negative_prompt: str = Inputs.negative_prompt,
@@ -211,7 +213,7 @@ class Trained14BLoraPredictor(Predictor):
             negative_prompt=negative_prompt,
             aspect_ratio=aspect_ratio,
             frames=frames,
-            model="14b",
+            model=self.model,
             lora_url=None,
             lora_strength_model=lora_strength_model,
             lora_strength_clip=lora_strength_clip,
@@ -221,3 +223,6 @@ class Trained14BLoraPredictor(Predictor):
             seed=seed,
             replicate_weights=replicate_weights,
         )
+
+class Trained1_3BLoraPredictor(Trained14BLoraPredictor):
+    model = "1.3b"

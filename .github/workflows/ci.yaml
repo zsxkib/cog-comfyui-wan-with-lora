@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       models:
-        description: 'Comma-separated list of models (standalone, trained14b) to push or "all"'
+        description: 'Comma-separated list of models (standalone, trained1.3b,trained14b) to push or "all"'
         type: string
         default: 'all'
 
@@ -44,7 +44,7 @@ jobs:
         REPLICATE_API_TOKEN: ${{ secrets.REPLICATE_API_TOKEN }}
       run: |
         if [ "${{ inputs.models }}" = "all" ]; then
-          models="standalone trained14b"
+          models="standalone, trained1.3b, trained14b"
         else
           models="${{ inputs.models }}"
         fi
