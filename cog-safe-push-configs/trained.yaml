@@ -14,4 +14,4 @@ predict:
     - inputs:
         prompt: "a 1.3b HOMER is laughing"
         # url contains 1.3b-lora.safetensors, which defaults to 1.3b
-        replicate_weights: "https://replicate.delivery/xezq/7kXMcHfE8GwHZ6CU4TR2iTod20dPX8SerMCMrRn16efou1hRB/trained_model.tar"
+        replicate_weights: "https://replicate.delivery/xezq/1LvZpbWhq8r5LNWbHdOUzCi7LF2DQgF5pQBW56C0Rg9AgIGF/trained_model.tar"
