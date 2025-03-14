@@ -76,6 +76,7 @@ class Inputs:
         default="Balanced",
     )
     resolution = Input(
+        description="The resolution of the video. 720p is not supported for 1.3b.",
         choices=["480p", "720p"],
         default="480p",
     )
