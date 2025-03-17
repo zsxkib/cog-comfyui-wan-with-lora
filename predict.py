@@ -222,7 +222,7 @@ class Predictor(BasePredictor):
         if fast_mode == "Off":
             # Turn off tea cache
             del workflow["54"]
-            workflow["49"]["inputs"]["model"] = ["53", 0]
+            workflow["49"]["inputs"]["model"] = ["37", 0]
         else:
             tea_cache = workflow["54"]["inputs"]
             tea_cache["coefficients"] = thresholds[model]["coefficients"]
@@ -241,6 +241,8 @@ class Predictor(BasePredictor):
             del workflow["49"]  # delete lora loader node
             positive_prompt["clip"] = ["38", 0]
             shift["model"] = ["53", 0] if fast_mode == "Off" else ["54", 0]
+
+        print(workflow)
 
     def generate(
         self,
