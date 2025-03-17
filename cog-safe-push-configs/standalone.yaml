@@ -30,12 +30,12 @@ predict:
         fast_mode: "Fast"
         lora_url: "https://replicate.delivery/xezq/begAR055rwyeb0sjY60xM01L9i2fJ8T11ofpHGfL6PCEYf2FF/trained_model.tar"
     - inputs:
-        prompt: "a LAEZEL woman looks around"
+        prompt: "In the video, a miniature person is presented. The person is held in a person's hands. The person then presses on the person, causing a sq41sh squish effect. The person keeps pressing down on the person, further showing the sq41sh squish effect."
         image: "https://replicate.delivery/xezq/acQsSCLoTPpFLBJjoo2ueLIflEA9XAGFqi0X1Y8A33n2zM9TA/out-0.webp"
         model: "14b"
         resolution: "480p"
-        fast_mode: "Off"
-        lora_url: "https://replicate.delivery/xezq/begAR055rwyeb0sjY60xM01L9i2fJ8T11ofpHGfL6PCEYf2FF/trained_model.tar"
+        fast_mode: "Balanced"
+        lora_url: "https://huggingface.co/Remade-AI/Squish/resolve/main/squish_18.safetensors?download=true"
     - inputs:
         prompt: "a LAEZEL woman is riding a horse"
         model: "14b"
