@@ -240,7 +240,7 @@ class Predictor(BasePredictor):
         else:
             del workflow["49"]  # delete lora loader node
             positive_prompt["clip"] = ["38", 0]
-            shift["model"] = ["53", 0] if fast_mode == "Off" else ["54", 0]
+            shift["model"] = ["37", 0] if fast_mode == "Off" else ["54", 0]
 
         print(workflow)
 
