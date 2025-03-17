@@ -242,8 +242,6 @@ class Predictor(BasePredictor):
             positive_prompt["clip"] = ["38", 0]
             shift["model"] = ["37", 0] if fast_mode == "Off" else ["54", 0]
 
-        print(workflow)
-
     def generate(
         self,
         prompt: str,
