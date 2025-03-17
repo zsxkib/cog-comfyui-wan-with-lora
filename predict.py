@@ -27,6 +27,10 @@ class Inputs:
     negative_prompt = Input(
         description="Things you do not want to see in your video", default=""
     )
+    image = Input(
+        description="Image to use as a starting frame for image to video generation.",
+        default=None,
+    )
     aspect_ratio = Input(
         description="The aspect ratio of the video. 16:9, 9:16, 1:1, etc.",
         choices=["16:9", "9:16", "1:1"],
@@ -97,6 +101,7 @@ class Predictor(BasePredictor):
             weights_to_download=[
                 "wan_2.1_vae.safetensors",
                 "umt5_xxl_fp16.safetensors",
+                "clip_vision_h.safetensors",
             ],
         )
 
@@ -126,24 +131,21 @@ class Predictor(BasePredictor):
         }
         return sizes[resolution][aspect_ratio]
 
-    def update_workflow(self, workflow, **kwargs):
-        model = kwargs["model"]
-        is_14b = model == "14b"
-
-        empty_latent_video = workflow["40"]["inputs"]
-        empty_latent_video["length"] = kwargs["frames"]
-
-        width, height = self.get_width_and_height(
-            kwargs["resolution"], kwargs["aspect_ratio"]
-        )
-        empty_latent_video["width"] = width
-        empty_latent_video["height"] = height
-
-        model_loader = workflow["37"]["inputs"]
-        if is_14b:
+    def set_model_loader(self, model_loader, model: str):
+        if model == "14b-i2v-480p":
+            model_loader["unet_name"] = "wan2.1_i2v_480p_14B_bf16.safetensors"
+        elif model == "14b-i2v-720p":
+            model_loader["unet_name"] = "wan2.1_i2v_720p_14B_bf16.safetensors"
+        elif model == "14b":
             model_loader["unet_name"] = "wan2.1_t2v_14B_bf16.safetensors"
-        else:
+        elif model == "1.3b":
             model_loader["unet_name"] = "wan2.1_t2v_1.3B_bf16.safetensors"
+
+    def update_workflow(self, workflow, **kwargs):
+        is_image_to_video = kwargs["image_filename"] is not None
+        model = f"{kwargs['model']}-i2v-{kwargs['resolution']}" if is_image_to_video else kwargs["model"]
+
+        self.set_model_loader(workflow["37"]["inputs"], model)
 
         positive_prompt = workflow["6"]["inputs"]
         positive_prompt["text"] = kwargs["prompt"]
@@ -159,14 +161,60 @@ class Predictor(BasePredictor):
         shift = workflow["48"]["inputs"]
         shift["shift"] = kwargs["sample_shift"]
 
+        if is_image_to_video:
+            del workflow["40"]
+            wan_i2v_latent = workflow["58"]["inputs"]
+            wan_i2v_latent["length"] = kwargs["frames"]
+
+            image_loader = workflow["55"]["inputs"]
+            image_loader["image"] = kwargs["image_filename"]
+
+            image_resizer = workflow["56"]["inputs"]
+            if kwargs["resolution"] == "720p":
+                image_resizer["target_size"] = 1008
+            else:
+                image_resizer["target_size"] = 644
+
+        else:
+            del workflow["55"]
+            del workflow["56"]
+            del workflow["57"]
+            del workflow["58"]
+            del workflow["59"]
+            del workflow["60"]
+            width, height = self.get_width_and_height(
+                kwargs["resolution"], kwargs["aspect_ratio"]
+            )
+            empty_latent_video = workflow["40"]["inputs"]
+            empty_latent_video["length"] = kwargs["frames"]
+            empty_latent_video["width"] = width
+            empty_latent_video["height"] = height
+
+            sampler["model"] = ["48", 0]
+            sampler["positive"] = ["6", 0]
+            sampler["negative"] = ["7", 0]
+            sampler["latent_image"] = ["40", 0]
+
         thresholds = {
             "14b": {
                 "Balanced": 0.15,
                 "Fast": 0.2,
+                "coefficients": "14B",
+            },
+            "14b-i2v-480p": {
+                "Balanced": 0.19,
+                "Fast": 0.26,
+                "coefficients": "i2v_480",
+            },
+            "14b-i2v-720p": {
+                "Balanced": 0.2,
+                "Fast": 0.3,
+                "coefficients": "i2v_720",
             },
             "1.3b": {
                 "Balanced": 0.07,
                 "Fast": 0.08,
+                "coefficients": "1.3B",
             },
         }
 
@@ -177,7 +225,7 @@ class Predictor(BasePredictor):
             workflow["49"]["inputs"]["model"] = ["53", 0]
         else:
             tea_cache = workflow["54"]["inputs"]
-            tea_cache["coefficients"] = "14B" if is_14b else "1.3B"
+            tea_cache["coefficients"] = thresholds[model]["coefficients"]
             tea_cache["rel_l1_thresh"] = thresholds[model][fast_mode]
 
         if kwargs["lora_url"] or kwargs["lora_filename"]:
@@ -198,6 +246,7 @@ class Predictor(BasePredictor):
         self,
         prompt: str,
         negative_prompt: str | None = None,
+        image: Path | None = None,
         aspect_ratio: str = "16:9",
         frames: int = 81,
         model: str | None = None,
@@ -214,6 +263,14 @@ class Predictor(BasePredictor):
     ) -> List[Path]:
         self.comfyUI.cleanup(ALL_DIRECTORIES)
         seed = seed_helper.generate(seed)
+
+        if image and model == "1.3b":
+            raise ValueError("Image to video generation is not supported for 1.3b")
+
+        image_filename = None
+        if image:
+            image_filename = self.filename_with_extension(image, "image")
+            self.handle_input_file(image, image_filename)
 
         lora_filename = None
         inferred_model_type = None
@@ -266,6 +323,7 @@ class Predictor(BasePredictor):
             lora_strength_model=lora_strength_model,
             lora_strength_clip=lora_strength_clip,
             resolution=resolution,
+            image_filename=image_filename,
         )
 
         wf = self.comfyUI.load_workflow(workflow)
@@ -280,6 +338,7 @@ class StandaloneLoraPredictor(Predictor):
         self,
         prompt: str = Inputs.prompt,
         negative_prompt: str = Inputs.negative_prompt,
+        image: Path = Inputs.image,
         aspect_ratio: str = Inputs.aspect_ratio,
         frames: int = Inputs.frames,
         model: str = Inputs.model,
@@ -296,6 +355,7 @@ class StandaloneLoraPredictor(Predictor):
         return self.generate(
             prompt=prompt,
             negative_prompt=negative_prompt,
+            image=image,
             aspect_ratio=aspect_ratio,
             frames=frames,
             model=model,
@@ -332,6 +392,7 @@ class TrainedLoraPredictor(Predictor):
         return self.generate(
             prompt=prompt,
             negative_prompt=negative_prompt,
+            image=None,
             aspect_ratio=aspect_ratio,
             frames=frames,
             model=None,

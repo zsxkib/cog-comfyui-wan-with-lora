@@ -23,6 +23,20 @@ predict:
         fast_mode: "Fast"
         lora_url: "https://replicate.delivery/xezq/begAR055rwyeb0sjY60xM01L9i2fJ8T11ofpHGfL6PCEYf2FF/trained_model.tar"
     - inputs:
+        prompt: "a LAEZEL woman looks around"
+        image: "https://replicate.delivery/xezq/acQsSCLoTPpFLBJjoo2ueLIflEA9XAGFqi0X1Y8A33n2zM9TA/out-0.webp"
+        model: "14b"
+        resolution: "720p"
+        fast_mode: "Fast"
+        lora_url: "https://replicate.delivery/xezq/begAR055rwyeb0sjY60xM01L9i2fJ8T11ofpHGfL6PCEYf2FF/trained_model.tar"
+    - inputs:
+        prompt: "a LAEZEL woman looks around"
+        image: "https://replicate.delivery/xezq/acQsSCLoTPpFLBJjoo2ueLIflEA9XAGFqi0X1Y8A33n2zM9TA/out-0.webp"
+        model: "14b"
+        resolution: "480p"
+        fast_mode: "Off"
+        lora_url: "https://replicate.delivery/xezq/begAR055rwyeb0sjY60xM01L9i2fJ8T11ofpHGfL6PCEYf2FF/trained_model.tar"
+    - inputs:
         prompt: "a LAEZEL woman is riding a horse"
         model: "14b"
         steps: 30
@@ -44,3 +58,8 @@ predict:
         prompt: "a MNCRFTMOV cat without a lora"
         model: "1.3b"
         fast_mode: "Fast"
+    - error_contains: Image to video generation is not supported for 1.3b
+      inputs:
+        prompt: "a bad input for 1.3b with image"
+        image: "https://replicate.delivery/xezq/acQsSCLoTPpFLBJjoo2ueLIflEA9XAGFqi0X1Y8A33n2zM9TA/out-0.webp"
+        model: "1.3b"

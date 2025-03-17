@@ -8,20 +8,20 @@
       "scheduler": "simple",
       "denoise": 1,
       "model": [
-        "48",
+        "53",
         0
       ],
       "positive": [
-        "6",
+        "58",
         0
       ],
       "negative": [
-        "7",
-        0
+        "58",
+        1
       ],
       "latent_image": [
-        "40",
-        0
+        "58",
+        2
       ]
     },
     "class_type": "KSampler",
@@ -73,7 +73,7 @@
   },
   "37": {
     "inputs": {
-      "unet_name": "wan2.1_t2v_14B_bf16.safetensors",
+      "unet_name": "",
       "weight_dtype": "default"
     },
     "class_type": "UNETLoader",
@@ -171,12 +171,12 @@
     "inputs": {
       "weight": 0.2,
       "model": [
-        "37",
+        "48",
         0
       ],
       "latent": [
-        "40",
-        0
+        "58",
+        2
       ]
     },
     "class_type": "WanVideoEnhanceAVideoKJ",
@@ -192,13 +192,124 @@
       "cache_device": "offload_device",
       "coefficients": "14B",
       "model": [
-        "53",
+        "37",
         0
       ]
     },
     "class_type": "WanVideoTeaCacheKJ",
     "_meta": {
       "title": "WanVideo Tea Cache (native)"
+    }
+  },
+  "55": {
+    "inputs": {
+      "image": "image.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "56": {
+    "inputs": {
+      "target_size": 644,
+      "multiple_of": 28,
+      "image": [
+        "55",
+        0
+      ]
+    },
+    "class_type": "Width and height for scaling image to ideal resolution 🪴",
+    "_meta": {
+      "title": "Width and height for scaling image to ideal resolution 🪴"
+    }
+  },
+  "57": {
+    "inputs": {
+      "width": [
+        "56",
+        0
+      ],
+      "height": [
+        "56",
+        1
+      ],
+      "interpolation": "lanczos",
+      "method": "stretch",
+      "condition": "always",
+      "multiple_of": 0,
+      "image": [
+        "55",
+        0
+      ]
+    },
+    "class_type": "ImageResize+",
+    "_meta": {
+      "title": "🔧 Image Resize"
+    }
+  },
+  "58": {
+    "inputs": {
+      "width": [
+        "56",
+        0
+      ],
+      "height": [
+        "56",
+        1
+      ],
+      "length": 33,
+      "batch_size": 1,
+      "positive": [
+        "6",
+        0
+      ],
+      "negative": [
+        "7",
+        0
+      ],
+      "vae": [
+        "39",
+        0
+      ],
+      "clip_vision_output": [
+        "59",
+        0
+      ],
+      "start_image": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "WanImageToVideo",
+    "_meta": {
+      "title": "WanImageToVideo"
+    }
+  },
+  "59": {
+    "inputs": {
+      "crop": "none",
+      "clip_vision": [
+        "60",
+        0
+      ],
+      "image": [
+        "57",
+        0
+      ]
+    },
+    "class_type": "CLIPVisionEncode",
+    "_meta": {
+      "title": "CLIP Vision Encode"
+    }
+  },
+  "60": {
+    "inputs": {
+      "clip_name": "clip_vision_h.safetensors"
+    },
+    "class_type": "CLIPVisionLoader",
+    "_meta": {
+      "title": "Load CLIP Vision"
     }
   }
 }
