@@ -15,3 +15,8 @@ predict:
         prompt: "a 1.3b HOMER is laughing"
         # url contains 1.3b-lora.safetensors, which defaults to 1.3b
         replicate_weights: "https://replicate.delivery/xezq/1LvZpbWhq8r5LNWbHdOUzCi7LF2DQgF5pQBW56C0Rg9AgIGF/trained_model.tar"
+    - inputs:
+        prompt: "SQUISH-IT Cute dog. A hand briefly enters the frame, then the perspective shifts to a pair of hands shaping red clay around the stove. The stove is then completely enveloped by the clay, which forms an organic, bulging shape with a small handle at the top. The final shot presents the clay-covered stove from a low angle on the white surface, with blurred kitchen elements in the background."
+        image: "https://replicate.delivery/pbxt/Mgbu40U0xQUFSbb2axGsKRQ6yLcOROM7ncxzJXNwuxgcMoUv/Screenshot%202025-03-19%20at%2011.24.14.png"
+        # url contains 14b-lora.safetensors, which defaults to 14b
+        replicate_weights: "https://replicate.delivery/xezq/nf2ep1RUu4rYV0exuvSv2Inbx8ZvVahvvWHHDrliqiPKM3zoA/trained_model.tar"
