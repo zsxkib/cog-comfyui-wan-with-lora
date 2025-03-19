@@ -3,12 +3,16 @@ import mimetypes
 import json
 import shutil
 import re
-from typing import List
+import time
+import statistics
+import platform
+from typing import List, Dict, Any, Optional, Tuple
 from cog import BasePredictor, Input, Path
 from comfyui import ComfyUI
 from cog_model_helpers import seed as seed_helper
 from replicate_weights import download_replicate_weights
 from dataclasses import dataclass
+import torch
 
 OUTPUT_DIR = "/tmp/outputs"
 INPUT_DIR = "/tmp/inputs"
@@ -23,7 +27,7 @@ os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
 
 @dataclass
 class Inputs:
-    prompt = Input(description="Text prompt for video generation")
+    prompt = Input(description="Text prompt for video generation", default="astronaut riding a unicorn on mars")
     negative_prompt = Input(
         description="Things you do not want to see in your video", default=""
     )
@@ -84,6 +88,16 @@ class Inputs:
         description="The resolution of the video. 720p is not supported for 1.3b.",
         choices=["480p", "720p"],
         default="480p",
+    )
+    benchmark = Input(
+        description="Run generation multiple times and report timing statistics",
+        default=False,
+    )
+    benchmark_runs = Input(
+        description="Number of benchmark runs if benchmarking is enabled",
+        default=5,
+        ge=1,
+        le=100,
     )
 
 
@@ -242,6 +256,179 @@ class Predictor(BasePredictor):
             positive_prompt["clip"] = ["38", 0]
             shift["model"] = ["37", 0] if fast_mode == "Off" else ["54", 0]
 
+    def benchmark_generate(
+        self, 
+        benchmark_runs: int, 
+        model_info: str, 
+        resolution: str, 
+        frames: int, 
+        fast_mode: str,
+        generate_kwargs: dict
+    ) -> List[Path]:
+        """Run benchmarking for the generate method"""
+        # Get GPU information
+        gpu_info = "Unknown GPU"
+        gpu_memory_gb = 0
+        if torch.cuda.is_available():
+            gpu_info = torch.cuda.get_device_name(0)
+            gpu_memory_gb = torch.cuda.get_device_properties(0).total_memory / (1024**3)  # Convert to GB
+        
+        # Determine if we're in image-to-video mode
+        is_i2v = generate_kwargs.get("image") is not None
+        mode_emoji = "🖼️➡️🎬" if is_i2v else "📝➡️🎬"
+        
+        # Get image dimensions if in i2v mode
+        image_dims = None
+        if is_i2v and generate_kwargs.get("image"):
+            try:
+                from PIL import Image
+                img = Image.open(generate_kwargs["image"])
+                image_dims = f"{img.width}x{img.height}"
+            except Exception:
+                image_dims = "Unknown"
+        
+        print(f"\n{'='*80}")
+        print(f"{mode_emoji} RUNNING BENCHMARK: {benchmark_runs} iterations")
+        print(f"Configuration: {model_info}, Resolution: {resolution}, Frames: {frames}, Fast Mode: {fast_mode}")
+        if is_i2v and image_dims:
+            print(f"Input Image: {image_dims}")
+        print(f"GPU: {gpu_info} ({gpu_memory_gb:.2f} GB)")
+        print(f"{'='*80}\n")
+        
+        execution_times = []
+        memory_usage = []
+        result = None
+        seed = generate_kwargs.get('seed')
+        start_total_time = time.time()
+        
+        for i in range(benchmark_runs):
+            print(f"Run {i+1}/{benchmark_runs}...")
+            
+            # Record initial GPU memory usage
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
+                initial_memory = torch.cuda.memory_allocated() / (1024**3)  # GB
+            
+            start_time = time.time()
+            
+            # Use the original seed for the first run, but different seeds for subsequent runs
+            if i > 0:
+                # Make sure we're generating an actual integer for the seed, not using the FieldInfo
+                current_kwargs = generate_kwargs.copy()
+                current_kwargs['seed'] = seed_helper.predict_seed()
+            else:
+                current_kwargs = generate_kwargs
+            
+            result = self.generate(**current_kwargs)
+            
+            end_time = time.time()
+            execution_time = end_time - start_time
+            execution_times.append(execution_time)
+            
+            # Record peak GPU memory usage
+            memory_used = 0
+            if torch.cuda.is_available():
+                peak_memory = torch.cuda.max_memory_allocated() / (1024**3)  # GB
+                memory_used = peak_memory - initial_memory
+                memory_usage.append(memory_used)
+                print(f"Run {i+1} completed in {execution_time:.2f} seconds (Peak GPU memory: {peak_memory:.2f} GB)")
+            else:
+                print(f"Run {i+1} completed in {execution_time:.2f} seconds")
+                
+            # Calculate running statistics
+            current_avg_time = statistics.mean(execution_times)
+            current_median_time = statistics.median(execution_times)
+            if len(execution_times) > 1:
+                current_stdev_time = statistics.stdev(execution_times)
+            else:
+                current_stdev_time = 0
+                
+            # Print running averages
+            print(f"  ⏱️ Running stats after run {i+1}:")
+            print(f"     • Average time: {current_avg_time:.2f} seconds")
+            print(f"     • Median time: {current_median_time:.2f} seconds")
+            if len(execution_times) > 1:
+                print(f"     • Std dev: {current_stdev_time:.2f} seconds")
+            if memory_usage:
+                current_avg_memory = statistics.mean(memory_usage)
+                current_median_memory = statistics.median(memory_usage)
+                print(f"     • Average memory: {current_avg_memory:.2f} GB")
+                print(f"     • Median memory: {current_median_memory:.2f} GB")
+            print()
+        
+        end_total_time = time.time()
+        total_time = end_total_time - start_total_time
+        
+        # Calculate final statistics
+        avg_time = statistics.mean(execution_times)
+        if len(execution_times) > 1:
+            stdev_time = statistics.stdev(execution_times)
+            median_time = statistics.median(execution_times)
+        else:
+            stdev_time = 0
+            median_time = execution_times[0]
+        min_time = min(execution_times)
+        max_time = max(execution_times)
+        
+        # Memory statistics if available
+        avg_memory = statistics.mean(memory_usage) if memory_usage else 0
+        median_memory = statistics.median(memory_usage) if memory_usage else 0
+        max_memory = max(memory_usage) if memory_usage else 0
+        
+        # Print detailed benchmark results
+        print(f"\n{'='*80}")
+        print(f"🔍 FINAL BENCHMARK RESULTS ({benchmark_runs} runs) {mode_emoji}")
+        print(f"{'='*80}")
+        
+        print(f"\n📊 SYSTEM INFO:")
+        print(f"  • GPU: {gpu_info}")
+        if torch.cuda.is_available():
+            print(f"  • GPU Memory: {gpu_memory_gb:.2f} GB")
+            print(f"  • CUDA Version: {torch.version.cuda}")
+            print(f"  • CUDA Capability: {torch.cuda.get_device_capability(0)}")
+        print(f"  • OS: {platform.system()} {platform.release()}")
+        print(f"  • Python: {platform.python_version()}")
+        print(f"  • PyTorch: {torch.__version__}")
+        
+        print(f"\n⚙️ CONFIGURATION:")
+        print(f"  • Model: {model_info}")
+        print(f"  • Mode: {'Image-to-Video' if is_i2v else 'Text-to-Video'}")
+        if is_i2v and image_dims:
+            print(f"  • Input Image: {image_dims}")
+        print(f"  • Resolution: {resolution}")
+        print(f"  • Frames: {frames}")
+        print(f"  • Fast Mode: {fast_mode}")
+        print(f"  • Prompt: {generate_kwargs.get('prompt', 'N/A')}")
+        print(f"  • Negative Prompt: {generate_kwargs.get('negative_prompt', 'N/A')}")
+        print(f"  • Sample Steps: {generate_kwargs.get('sample_steps', 'N/A')}")
+        
+        print(f"\n⏱️ RESULTS:")
+        print(f"  • Average time: {avg_time:.2f} seconds")
+        print(f"  • Median time: {median_time:.2f} seconds")
+        print(f"  • Standard deviation: {stdev_time:.2f} seconds")
+        print(f"  • Minimum time: {min_time:.2f} seconds")
+        print(f"  • Maximum time: {max_time:.2f} seconds")
+        print(f"  • Total benchmark time: {total_time:.2f} seconds")
+        if memory_usage:
+            print(f"  • Average GPU memory usage: {avg_memory:.2f} GB")
+            print(f"  • Median GPU memory usage: {median_memory:.2f} GB")
+            print(f"  • Maximum GPU memory usage: {max_memory:.2f} GB")
+            
+        print(f"\n🔢 INDIVIDUAL RUN TIMES:")
+        for i, (t, m) in enumerate(zip(execution_times, memory_usage if memory_usage else [0] * len(execution_times))):
+            if memory_usage:
+                print(f"  • Run {i+1}: {t:.2f} seconds, {m:.2f} GB memory")
+            else:
+                print(f"  • Run {i+1}: {t:.2f} seconds")
+                
+        print(f"\n{'='*80}")
+        
+        # Reset the seed for consistency
+        if isinstance(seed, int):
+            generate_kwargs['seed'] = seed
+        
+        return result
+
     def generate(
         self,
         prompt: str,
@@ -262,7 +449,13 @@ class Predictor(BasePredictor):
         replicate_weights: str | None = None,
     ) -> List[Path]:
         self.comfyUI.cleanup(ALL_DIRECTORIES)
-        seed = seed_helper.generate(seed)
+        
+        # Ensure seed is a proper integer and not a FieldInfo object
+        if isinstance(seed, int) or seed is None:
+            seed = seed_helper.generate(seed)
+        else:
+            # If it's a FieldInfo or other object, generate a new random seed
+            seed = seed_helper.generate(None)
 
         if image and model == "1.3b":
             raise ValueError("Image to video generation is not supported for 1.3b")
@@ -351,25 +544,43 @@ class StandaloneLoraPredictor(Predictor):
         sample_guide_scale: float = Inputs.sample_guide_scale,
         sample_shift: float = Inputs.sample_shift,
         seed: int = seed_helper.predict_seed(),
+        benchmark: bool = Inputs.benchmark,
+        benchmark_runs: int = Inputs.benchmark_runs,
     ) -> List[Path]:
-        return self.generate(
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            image=image,
-            aspect_ratio=aspect_ratio,
-            frames=frames,
-            model=model,
-            resolution=resolution,
-            lora_url=lora_url,
-            lora_strength_model=lora_strength_model,
-            lora_strength_clip=lora_strength_clip,
-            fast_mode=fast_mode,
-            sample_shift=sample_shift,
-            sample_guide_scale=sample_guide_scale,
-            sample_steps=sample_steps,
-            seed=seed,
-            replicate_weights=None,
-        )
+        generate_kwargs = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "image": image,
+            "aspect_ratio": aspect_ratio,
+            "frames": frames,
+            "model": model,
+            "resolution": resolution,
+            "lora_url": lora_url,
+            "lora_strength_model": lora_strength_model,
+            "lora_strength_clip": lora_strength_clip,
+            "fast_mode": fast_mode,
+            "sample_shift": sample_shift,
+            "sample_guide_scale": sample_guide_scale,
+            "sample_steps": sample_steps,
+            "seed": seed,
+            "replicate_weights": None,
+        }
+
+        if not benchmark:
+            return self.generate(**generate_kwargs)
+        else:
+            # Determine if we're in image-to-video (i2v) or text-to-video (t2v) mode
+            mode = "i2v" if image else "t2v"
+            model_info = f"{model} ({mode})"
+            
+            return self.benchmark_generate(
+                benchmark_runs=benchmark_runs,
+                model_info=model_info,
+                resolution=resolution,
+                frames=frames,
+                fast_mode=fast_mode,
+                generate_kwargs=generate_kwargs
+            )
 
 
 class TrainedLoraPredictor(Predictor):
@@ -388,22 +599,41 @@ class TrainedLoraPredictor(Predictor):
         sample_shift: float = Inputs.sample_shift,
         seed: int = seed_helper.predict_seed(),
         replicate_weights: str = Inputs.replicate_weights,
+        benchmark: bool = Inputs.benchmark,
+        benchmark_runs: int = Inputs.benchmark_runs,
+        image: Path = None,
     ) -> List[Path]:
-        return self.generate(
-            prompt=prompt,
-            negative_prompt=negative_prompt,
-            image=None,
-            aspect_ratio=aspect_ratio,
-            frames=frames,
-            model=None,
-            resolution=resolution,
-            lora_url=None,
-            lora_strength_model=lora_strength_model,
-            lora_strength_clip=lora_strength_clip,
-            fast_mode=fast_mode,
-            sample_shift=sample_shift,
-            sample_guide_scale=sample_guide_scale,
-            sample_steps=sample_steps,
-            seed=seed,
-            replicate_weights=replicate_weights,
-        )
+        generate_kwargs = {
+            "prompt": prompt,
+            "negative_prompt": negative_prompt,
+            "image": image,
+            "aspect_ratio": aspect_ratio,
+            "frames": frames,
+            "model": None,
+            "resolution": resolution,
+            "lora_url": None,
+            "lora_strength_model": lora_strength_model,
+            "lora_strength_clip": lora_strength_clip,
+            "fast_mode": fast_mode,
+            "sample_shift": sample_shift,
+            "sample_guide_scale": sample_guide_scale,
+            "sample_steps": sample_steps,
+            "seed": seed,
+            "replicate_weights": replicate_weights,
+        }
+
+        if not benchmark:
+            return self.generate(**generate_kwargs)
+        else:
+            # Determine if we're in image-to-video (i2v) or text-to-video (t2v) mode
+            mode = "i2v" if image else "t2v"
+            model_info = f"LoRA ({mode})" if replicate_weights else f"Default ({mode})"
+            
+            return self.benchmark_generate(
+                benchmark_runs=benchmark_runs,
+                model_info=model_info,
+                resolution=resolution,
+                frames=frames,
+                fast_mode=fast_mode,
+                generate_kwargs=generate_kwargs
+            )
