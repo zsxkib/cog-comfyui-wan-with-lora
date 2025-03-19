@@ -377,6 +377,7 @@ class TrainedLoraPredictor(Predictor):
         self,
         prompt: str = Inputs.prompt,
         negative_prompt: str = Inputs.negative_prompt,
+        image: Path = Inputs.image,
         aspect_ratio: str = Inputs.aspect_ratio,
         frames: int = Inputs.frames,
         resolution: str = Inputs.resolution,
@@ -392,7 +393,7 @@ class TrainedLoraPredictor(Predictor):
         return self.generate(
             prompt=prompt,
             negative_prompt=negative_prompt,
-            image=None,
+            image=image,
             aspect_ratio=aspect_ratio,
             frames=frames,
             model=None,
